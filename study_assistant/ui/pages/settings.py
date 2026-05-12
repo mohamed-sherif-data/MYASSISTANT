@@ -265,26 +265,33 @@ class SettingsPage(tk.Frame):
 
     def _refresh_subjects(self) -> None:
         self.subj_list.delete(0, "end")
-        subjects = self.app.db.get_subjects()
+        # قراءة المواد من الإعدادات
+        subjects = json.loads(self.app.db.get_setting("subjects", json.dumps(DEFAULT_SUBJECTS)))
         for s in sorted(subjects):
             self.subj_list.insert("end", s)
 
     def _add_subject(self) -> None:
         new_subj = self.new_subj_var.get().strip()
-        if new_subj and new_subj not in self.app.db.get_subjects():
-            self.app.db.add_subject(new_subj)
-            self.new_subj_var.set("")
-            self._refresh_subjects()
-            messagebox.showinfo("✅", f"تمت إضافة: {new_subj}")
+        if new_subj:
+            subjects = json.loads(self.app.db.get_setting("subjects", json.dumps(DEFAULT_SUBJECTS)))
+            if new_subj not in subjects:
+                subjects.append(new_subj)
+                self.app.db.set_setting("subjects", json.dumps(subjects))
+                self.new_subj_var.set("")
+                self._refresh_subjects()
+                messagebox.showinfo("✅", f"تمت إضافة: {new_subj}")
 
     def _del_subject(self) -> None:
         sel = self.subj_list.curselection()
         if sel:
             subj = self.subj_list.get(sel[0])
             if subj and subj != "بدون مادة":
-                self.app.db.delete_subject(subj)
-                self._refresh_subjects()
-                messagebox.showinfo("✅", f"تم حذف: {subj}")
+                subjects = json.loads(self.app.db.get_setting("subjects", json.dumps(DEFAULT_SUBJECTS)))
+                if subj in subjects:
+                    subjects.remove(subj)
+                    self.app.db.set_setting("subjects", json.dumps(subjects))
+                    self._refresh_subjects()
+                    messagebox.showinfo("✅", f"تم حذف: {subj}")
 
     def _pomo_settings(self) -> None:
         from ui.dialogs import PomodoroSettingsDialog
