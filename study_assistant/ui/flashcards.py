@@ -227,6 +227,12 @@ class FlashcardsWindow:
 
         # تحديث SRS في قاعدة البيانات
         self.app.db.update_srs(w["word"], quality)
+        
+        # تسجيل للمراجعة لتتبع نقاط الضعف
+        try:
+            self.app.db.log_review(w["word"], quality, "flashcard", 0)
+        except Exception:
+            pass
 
         self.current_index += 1
         self._load_card()
@@ -263,7 +269,7 @@ class FlashcardsWindow:
         # تحديث XP والتحدي
         if self.total_reviewed > 0:
             self.app.xp.on_quiz_complete(accuracy, self.total_reviewed)
-            self.app.challenge.update("quiz", accuracy)
+            self.app.challenge.update("quiz", self.correct_count)
 
         tk.Button(f, text="✖  إغلاق", command=self.win.destroy,
                   bg=C["surface2"], fg=C["text"], font=("Arial", 11),

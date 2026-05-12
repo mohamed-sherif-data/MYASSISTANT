@@ -1,0 +1,6 @@
+*.pyc
+__pycache__/
+*.db
+.tts_cache/
+study_assistant.log
+config.env

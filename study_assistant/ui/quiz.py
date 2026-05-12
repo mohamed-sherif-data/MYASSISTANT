@@ -183,7 +183,8 @@ class QuizWindow:
         self.answered = False
         w = self.words[self.current_index]
 
-        self.lbl_prog.config(text=f"{self.current_index + 1} / {len(self.words)}")
+        import time
+        self._start_time = time.time()
         self.pbar_var.set(self.current_index)
         self.lbl_score.config(text=f"✅ {self.correct_count}  ❌ {self.total_answered - self.correct_count}")
 
@@ -458,8 +459,10 @@ class QuizWindow:
         self.total_answered += 1
         for btn, correct in self._fb_buttons:
             btn.config(state="disabled", cursor="arrow")
-            if correct: btn.config(bg=C["primary"], fg="white")
-            else: btn.config(bg=C["danger"], fg="white")
+            if correct:
+                btn.config(bg=C["primary"], fg="white")
+            else:
+                btn.config(bg=C["danger"], fg="white")
         self._evaluate(is_correct)
 
     # ─ـ التقييم المشترك ──────────────────────────────────────────────────
@@ -468,9 +471,22 @@ class QuizWindow:
             self.correct_count += 1
             self.app.sound.beep("correct")
             self.app.db.update_srs(self.words[self.current_index]["word"], 2)
+            quality = 2
         else:
             self.app.sound.beep("wrong")
             self.app.db.update_srs(self.words[self.current_index]["word"], 0)
+            quality = 0
+        
+        # تسجيل للمراجعة لتتبع نقاط الضعف
+        time_ms = 0
+        if hasattr(self, "_start_time"):
+            import time
+            time_ms = int((time.time() - self._start_time) * 1000)
+        try:
+            self.app.db.log_review(self.words[self.current_index]["word"], quality, self.mode, time_ms)
+        except Exception:
+            pass
+        
         self._show_next_btn()
 
     def _show_next_btn(self) -> None:
@@ -506,7 +522,7 @@ class QuizWindow:
         if not self.win: return
         accuracy = int(self.correct_count / self.total_answered * 100) if self.total_answered else 0
         self.app.xp.on_quiz_complete(accuracy, self.total_answered)
-        self.app.challenge.update("quiz", accuracy)
+        self.app.challenge.update("quiz", self.correct_count)
 
         for w in self.win.winfo_children():
             w.destroy()

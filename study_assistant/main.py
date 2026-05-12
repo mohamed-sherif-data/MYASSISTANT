@@ -24,6 +24,7 @@ from services.groq_client import GroqClient, GROQ_MODELS
 from services.translator import TranslationManager
 from services.pdf_manager import PDFManager
 from services.youtube import YouTubeSummarizer, HAS_YT
+from services.sentence_builder import SentenceBuilder
 
 # ── ui ────────────────────────────────────────────────────────────────────
 from ui.dashboard import Dashboard
@@ -82,6 +83,9 @@ class StudyAssistant:
 
         # ─ـ YouTube ───────────────────────────────────────────────────────
         self.youtube = YouTubeSummarizer(self.db, self.groq, self.pdf)
+
+        # ─ـ Sentence Builder ────────────────────────────────────────────
+        self.sentences = SentenceBuilder(self.groq)
 
         # ─ـ ربط observer ────────────────────────────────────────────────
         self.db.on_word_saved(lambda total: [

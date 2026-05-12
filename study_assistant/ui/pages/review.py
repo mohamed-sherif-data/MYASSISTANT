@@ -96,12 +96,12 @@ class ReviewPage(tk.Frame):
         return frame
 
     def _get_filtered_words(self) -> list[dict]:
-        """إرجاع الكلمات بعد تطبيق فلتر المادة."""
-        all_words = self.app.db.load_words()
+        """إرجاع الكلمات المستحقة بعد تطبيق فلتر المادة."""
         subj = self.subject_var.get()
+        due = self.app.db.get_due_words()
         if subj != "الكل":
-            return [w for w in all_words if w.get("subject", "") == subj]
-        return all_words
+            due = [w for w in due if w.get("subject", "") == subj]
+        return due
 
     def _get_due_words(self) -> list[dict]:
         """الكلمات المستحقة مع الفلتر."""
