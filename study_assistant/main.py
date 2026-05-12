@@ -188,26 +188,107 @@ class StudyAssistant:
             t.after(5000, t.destroy)
         self.root.after(0, _build)
 
-    # ─ـ Tray ──────────────────────────────────────────────────────────────
+    # ── Tray + Reminders ───────────────────────────────────────────────────
     def _setup_tray(self) -> None:
+        """إعداد أيقونة النظام + قائمة."""
         try:
             import pystray
-            from PIL import Image, ImageDraw
+            from pystray import MenuItem as item, Menu
+            from PIL import Image, ImageDraw, ImageFont
 
-            def _make_icon():
-                img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+            def _make_icon(color: str = "#4a90d9", sub: str = "") -> Image.Image:
+                """إنشاء أيقونة ديناميكية."""
+                size = 64
+                img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
                 d = ImageDraw.Draw(img)
-                d.ellipse([2, 2, 62, 62], fill=(74, 144, 217, 255))
+                # parse color
+                if color.startswith("#"):
+                    r = int(color[1:3], 16)
+                    g = int(color[3:5], 16)
+                    b = int(color[5:7], 16)
+                else:
+                    r, g, b = 74, 144, 217
+                d.ellipse([2, 2, size-2, size-2], fill=(r, g, b, 255))
                 return img
 
-            self.tray = pystray.Icon("SA80", _make_icon(), "مساعد المذاكرة v8.0")
-            # FIX: كان threading غير مستورد هنا — أصبح مستورداً في أعلى الملف
+            def _build_menu():
+                return Menu(
+                    item(f"🍅 {self.pomodoro.status_label()}", None, enabled=False),
+                    item(f"⏳ {self.pomodoro.time_str()}", None, enabled=False),
+                    Menu.SEPARATOR,
+                    item("🖥️ لوحة التحكم", lambda i, m: self.root.after(0, self.dashboard.show)),
+                    Menu.SEPARATOR,
+                    item("▶️ بدء", lambda i, m: self.pomodoro.start(), enabled=not self.pomodoro.running),
+                    item("⏸️ مؤقت", lambda i, m: self.pomodoro.pause(), enabled=self.pomodoro.running),
+                    item("⏹️ إيقاف", lambda i, m: self.pomodoro.stop(), enabled=self.pomodoro.running),
+                    Menu.SEPARATOR,
+                    item("🃏 مراجعة", lambda i, m: self.root.after(0, lambda: self._open_review("flashcard"))),
+                    item("🎯 اختبار", lambda i, m: self.root.after(0, lambda: self._open_review("quiz"))),
+                    item("⏱️ ساعة عائمة", lambda i, m: self.float_timer.toggle()),
+                    Menu.SEPARATOR,
+                    item("🚪 خروج", self._quit),
+                )
+
+            self.tray = pystray.Icon("SA80", _make_icon(), "مساعد المذاكرة v8.0", _build_menu())
+            
+            # تحديث الأيقونة كل ثانية
+            def _update_tray_icon():
+                if not hasattr(self, 'tray') or not self.tray:
+                    return
+                color_map = {
+                    "work": "#238636",  # أخضر
+                    "short_break": "#d29922",  # أصفر
+                    "long_break": "#d29922",
+                    "idle": "#4a90d9",  # أزرق
+                }
+                clr = color_map.get(self.pomodoro.phase, "#4a90d9")
+                sub = self.pomodoro.time_str() if self.pomodoro.running else ""
+                try:
+                    self.tray.icon = _make_icon(clr, sub)
+                    self.tray.menu = _build_menu()
+                except:
+                    pass
+                self.root.after(1000, _update_tray_icon)
+            
+            self.root.after(1500, _update_tray_icon)
             threading.Thread(target=self.tray.run, daemon=True).start()
+            logger.info("System tray initialized ✅")
         except Exception as e:
             logger.error(f"Tray setup: {e}")
 
     def _update_tray(self) -> None:
-        pass
+        """تحديث الأيقونة (يُستدعى من البومودورو)."""
+        if hasattr(self, 'tray') and self.tray:
+            try:
+                import pystray
+                from PIL import Image, ImageDraw
+                color_map = {"work": "#238636", "short_break": "#d29922", "long_break": "#d29922", "idle": "#4a90d9"}
+                clr = color_map.get(self.pomodoro.phase, "#4a90d9")
+                size = 64
+                img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+                d = ImageDraw.Draw(img)
+                r = int(clr[1:3], 16)
+                g = int(clr[3:5], 16)
+                b = int(clr[5:7], 16)
+                d.ellipse([2, 2, size-2, size-2], fill=(r, g, b, 255))
+                self.tray.icon = img
+            except:
+                pass
+
+    def _startup_reminder(self) -> None:
+        """تذكير عند التشغيل لو لم تذاكر اليوم."""
+        def _check():
+            import time as t
+            t.sleep(2)
+            reminder = self.db.get_setting("study_reminder", "")
+            if reminder:
+                self.root.after(0, lambda: self._show_reminder(reminder))
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _show_reminder(self, msg: str) -> None:
+        """عرض نافذة التذكير."""
+        from tkinter import messagebox
+        messagebox.showinfo("⏰ تذكير", msg)
 
     def run(self) -> None:
         self.dashboard.show()
