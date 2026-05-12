@@ -49,12 +49,20 @@ class PomodoroTimer:
     def _load_config(self) -> None:
         saved = self.db.get_json_setting("pomodoro_config") or {}
         self.cfg = {**DEFAULT_CONFIG, **saved}
+        
+        # مفاتيح الأرقام فقط
+        int_keys = {"work_duration", "short_break", "long_break", "cycles_before_long", "sound_enabled"}
         for k in DEFAULT_CONFIG:
-            try:
-                val = self.cfg.get(k, DEFAULT_CONFIG[k])
-                self.cfg[k] = int(val) if val not in (None, "", "None") else DEFAULT_CONFIG[k]
-            except (ValueError, TypeError):
-                self.cfg[k] = DEFAULT_CONFIG[k]
+            if k in int_keys:
+                try:
+                    val = self.cfg.get(k, DEFAULT_CONFIG[k])
+                    self.cfg[k] = int(val) if val not in (None, "", "None") else DEFAULT_CONFIG[k]
+                except (ValueError, TypeError):
+                    self.cfg[k] = DEFAULT_CONFIG[k]
+            else:
+                # النصوص (مثل custom_sound)
+                if k not in self.cfg or self.cfg[k] in (None, ""):
+                    self.cfg[k] = DEFAULT_CONFIG[k]
 
     def save_config(self) -> None:
         self.db.set_json_setting("pomodoro_config", self.cfg)
