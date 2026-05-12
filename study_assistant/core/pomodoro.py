@@ -50,7 +50,11 @@ class PomodoroTimer:
         saved = self.db.get_json_setting("pomodoro_config") or {}
         self.cfg = {**DEFAULT_CONFIG, **saved}
         for k in DEFAULT_CONFIG:
-            self.cfg[k] = int(self.cfg.get(k, DEFAULT_CONFIG[k]))
+            try:
+                val = self.cfg.get(k, DEFAULT_CONFIG[k])
+                self.cfg[k] = int(val) if val not in (None, "", "None") else DEFAULT_CONFIG[k]
+            except (ValueError, TypeError):
+                self.cfg[k] = DEFAULT_CONFIG[k]
 
     def save_config(self) -> None:
         self.db.set_json_setting("pomodoro_config", self.cfg)
