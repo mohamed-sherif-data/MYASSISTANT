@@ -93,6 +93,17 @@ class Database:
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS review_history (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            word       TEXT NOT NULL COLLATE NOCASE,
+            quality    INTEGER NOT NULL,
+            mode       TEXT NOT NULL,
+            time_ms    INTEGER DEFAULT 0,
+            timestamp  TEXT NOT NULL,
+            session_id INTEGER,
+            FOREIGN KEY(session_id) REFERENCES sessions(id)
+        );
         """)
         conn.commit()
 
@@ -332,3 +343,185 @@ class Database:
         except Exception as e:
             logger.error(f"Migration failed: {e}")
         return count
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Weakness Detection - تحليل نقاط الضعف
+    # ══════════════════════════════════════════════════════════════════════
+    def log_review(self, word: str, quality: int, mode: str, time_ms: int = 0) -> None:
+        """تسجيل مراجعة لتتبع نقاط الضعف."""
+        from datetime import datetime
+        try:
+            self.conn.execute("""
+                INSERT INTO review_history (word, quality, mode, time_ms, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (word, quality, mode, time_ms, datetime.now().isoformat()))
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"log_review: {e}")
+
+    def get_weakness_analysis(self, days: int = 30) -> dict:
+        """تحليل نقاط الضعف خلال فترة معينة."""
+        import datetime as dt
+        since = (dt.date.today() - dt.timedelta(days=days)).isoformat()
+        
+        # الأخطاء حسب نوع الاختبار
+        mode_errors = self.conn.execute("""
+            SELECT mode, COUNT(*) as total,
+                   SUM(CASE WHEN quality < 2 THEN 1 ELSE 0 END) as errors
+            FROM review_history
+            WHERE timestamp >= ? AND quality < 2
+            GROUP BY mode
+        """, (since,)).fetchall()
+        
+        # الكلمات الضعيفة (أخطاء متكررة)
+        weak_words = self.conn.execute("""
+            SELECT word, COUNT(*) as attempts,
+                   SUM(CASE WHEN quality < 2 THEN 1 ELSE 0 END) as errors
+            FROM review_history
+            WHERE timestamp >= ?
+            GROUP BY word
+            HAVING errors > 1
+            ORDER BY errors DESC
+            LIMIT 20
+        """, (since,)).fetchall()
+        
+        # الأخطاء حسب المستوى
+        level_errors = self.conn.execute("""
+            SELECT w.level, COUNT(*) as total,
+                   SUM(CASE WHEN rh.quality < 2 THEN 1 ELSE 0 END) as errors
+            FROM review_history rh
+            JOIN words w ON rh.word = w.word
+            WHERE rh.timestamp >= ? AND rh.quality < 2
+            GROUP BY w.level
+        """, (since,)).fetchall()
+        
+        # وقت الاستجابة المتوسط
+        avg_time = self.conn.execute("""
+            SELECT AVG(time_ms) as avg_ms FROM review_history
+            WHERE timestamp >= ? AND time_ms > 0
+        """, (since,)).fetchone()
+        
+        # الأخطاء حسب وقت اليوم
+        time_errors = self.conn.execute("""
+            SELECT 
+                CASE 
+                    WHEN CAST(strftime('%H', timestamp) AS INT) < 12 THEN 'صباحاً'
+                    WHEN CAST(strftime('%H', timestamp) AS INT) < 18 THEN 'ظهراً'
+                    ELSE 'مساءً'
+                END as period,
+                COUNT(*) as total,
+                SUM(CASE WHEN quality < 2 THEN 1 ELSE 0 END) as errors
+            FROM review_history
+            WHERE timestamp >= ?
+            GROUP BY period
+        """, (since,)).fetchall()
+        
+        return {
+            "mode_errors": {r["mode"]: {"total": r["total"], "errors": r["errors"]} for r in mode_errors},
+            "weak_words": [{"word": w["word"], "attempts": w["attempts"], "errors": w["errors"]} for w in weak_words],
+            "level_errors": {r["level"]: {"total": r["total"], "errors": r["errors"]} for r in level_errors},
+            "avg_time_ms": int(avg_time["avg_ms"] or 0) if avg_time else 0,
+            "time_errors": {r["period"]: {"total": r["total"], "errors": r["errors"]} for r in time_errors},
+        }
+
+    def get_weakness_report(self) -> str:
+        """تقرير نصي مفصل عن نقاط الضعف."""
+        analysis = self.get_weakness_analysis(30)
+        lines = ["📊 تقرير نقاط الضعف (آخر 30 يوم)", "="*35]
+        
+        # حسب نوع الاختبار
+        if mode_err := analysis.get("mode_errors"):
+            lines.append("\n🔸 حسب نوع الاختبار:")
+            for mode, data in sorted(mode_err.items(), key=lambda x: x[1]["errors"], reverse=True):
+                pct = int(data["errors"]/data["total"]*100) if data["total"] else 0
+                if pct > 30:
+                    lines.append(f"  ⚠️ {mode}: {pct}% خطأ ({data['errors']}/{data['total']})")
+        
+        # الكلمات الضعيفة
+        if weak := analysis.get("weak_words")[:5]:
+            lines.append("\n🔸 كلمات تحتاج مراجعة:")
+            for w in weak:
+                lines.append(f"  • {w['word']} ({w['errors']} خطأ من {w['attempts']})")
+        
+        # حسب المستوى
+        if lvl_err := analysis.get("level_errors"):
+            lines.append("\n🔸 حسب المستوى:")
+            for lvl, data in sorted(lvl_err.items(), key=lambda x: x[1]["errors"], reverse=True)[:3]:
+                pct = int(data["errors"]/data["total"]*100) if data["total"] else 0
+                if pct > 20:
+                    lines.append(f"  ⚠️ {lvl}: {pct}% خطأ")
+        
+        # التوصية
+        rec = self._get_recommendation(analysis)
+        if rec:
+            lines.append(f"\n💡 التوصية: {rec}")
+        
+        return "\n".join(lines)
+
+    def _get_recommendation(self, analysis: dict) -> str:
+        """توليد توصية بناءً على التحليل."""
+        mode_err = analysis.get("mode_errors", {})
+        lvl_err = analysis.get("level_errors", {})
+        
+        # إذا لا توجد بيانات، return رسالة افتراضية
+        if not mode_err and not lvl_err:
+            return "لا توجد بيانات مراجعة كافية بعد"
+        
+        # إيجاد الأضعف
+        try:
+            worst_mode = max(mode_err.items(), key=lambda x: x[1]["errors"]/x[1]["total"] if x[1]["total"] else 0)
+        except (ValueError, TypeError):
+            worst_mode = ("default", {"errors": 0, "total": 0})
+        
+        try:
+            worst_level = max(lvl_err.items(), key=lambda x: x[1]["errors"]/x[1]["total"] if x[1]["total"] else 0)
+        except (ValueError, TypeError):
+            worst_level = ("default", {"errors": 0, "total": 0})
+        
+        pct_mode = worst_mode[1]["errors"]/worst_mode[1]["total"]*100 if worst_mode[1]["total"] else 0
+        pct_level = worst_level[1]["errors"]/worst_level[1]["total"]*100 if worst_level[1]["total"] else 0
+        
+        if pct_mode > 40:
+            return f"ركّز على مراجعة {worst_mode[0]} أكثر"
+        elif pct_level > 30:
+            return f"كلمات {worst_level[0]} تحتاج مراجعة أكثر"
+        elif analysis.get("avg_time_ms", 0) > 10000:
+            return "حاول الإجابة بسرعة أكبر"
+        else:
+            return "مجهود جيد! continue reviewing"
+
+    def get_adaptive_interval(self, word: str, quality: int) -> int:
+        """تحديدفترة المراجعة الذكيّة."""
+        intervals = [0,1,3,7,14,30,90]
+        
+        # الحصول على بيانات الكلمة
+        row = self.conn.execute(
+            "SELECT srs_level FROM words WHERE word=? COLLATE NOCASE", (word,)
+        ).fetchone()
+        if not row:
+            return intervals[2]
+        
+        srs = row["srs_level"]
+        
+        # فحص أنماط الأخطاء المتكررة
+        recent = self.conn.execute("""
+            SELECT COUNT(*) as cnt FROM review_history
+            WHERE word=? COLLATE NOCASE AND quality < 2
+            ORDER BY timestamp DESC LIMIT 5
+        """, (word,)).fetchone()
+        
+        recent_errors = recent["cnt"] if recent else 0
+        
+        # إذا كان هناك أخطاء متكررة، shorten interval
+        if recent_errors >= 3:
+            new_srs = max(0, srs - 1)
+        elif quality == 3:
+            new_srs = min(srs + 2, 6)
+        elif quality == 2:
+            new_srs = min(srs + 1, 6)
+        elif quality == 1:
+            new_srs = max(0, srs - 1)
+        else:
+            new_srs = 0
+        
+        return intervals[new_srs] if new_srs < len(intervals) else 90

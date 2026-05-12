@@ -33,6 +33,10 @@ class WordsPage(tk.Frame):
                   command=self._delete_selected,
                   bg=C["danger"], fg="white", font=("Arial", 9, "bold"),
                   relief="flat", padx=10, pady=4).pack(side="right", padx=6)
+        tk.Button(hdr, text="📖_generate_story",
+                  command=self._generate_story,
+                  bg=C["accent"], fg="white", font=("Arial", 9),
+                  relief="flat", padx=10, pady=4).pack(side="right")
 
         # حقل البحث
         sf = tk.Frame(self, bg=C["bg"])
@@ -178,3 +182,54 @@ class WordsPage(tk.Frame):
                 self.detail_lbl.pack()
             else:
                 messagebox.showerror("خطأ", "لم يتم العثور على الكلمة")
+
+    def _generate_story(self) -> None:
+        """توليد قصة من كلمات المستخدم."""
+        words = self.app.db.load_words()
+        if len(words) < 3:
+            messagebox.showinfo("تنبيه", "أضف 3 كلمات على الأقل")
+            return
+        
+        # اختيار كلمات عشوائية
+        import random
+        word_list = [w["word"] for w in words[:50]]
+        selected = random.sample(word_list, min(6, len(word_list)))
+        
+        try:
+            story = self.app.sentences.generate_story(selected)
+            
+            # عرض في نافذة جديدة
+            win = tk.Toplevel(self.app.root)
+            win.title("📖 قصة من كلماتك")
+            win.configure(bg=C["bg"])
+            win.geometry("500x400")
+            
+            f = tk.Frame(win, bg=C["bg"], padx=20, pady=20)
+            f.pack(fill="both", expand=True)
+            
+            tk.Label(f, text="📖 قصة باستخدام كلماتك:", bg=C["bg"], fg=C["text"],
+                     font=("Arial", 12, "bold")).pack(pady=(0, 10))
+            
+            # عرض القصة
+            txt = tk.Text(f, bg=C["surface"], fg=C["text"],
+                          font=("Consolas", 11), wrap="word",
+                          height=12, bd=0)
+            txt.pack(fill="both", expand=True)
+            txt.insert("1.0", story)
+            txt.config(state="disabled")
+            
+            # زر النسخ
+            def copy_story():
+                try:
+                    import pyperclip
+                    pyperclip.copy(story)
+                except:
+                    pass
+            
+            tk.Button(f, text="📋 نسخ", command=copy_story,
+                      bg=C["surface2"], fg=C["text"],
+                      font=("Arial", 10), relief="flat",
+                      padx=16, pady=6).pack(pady=10)
+            
+        except Exception as e:
+            messagebox.showerror("خطأ", f"فشل توليد القصة: {e}")

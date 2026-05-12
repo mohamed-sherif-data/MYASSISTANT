@@ -98,4 +98,28 @@ class StatsPage(tk.Frame):
             tk.Label(col, text=day_names[d.weekday()], bg=C["bg"],
                      fg=C["text3"], font=("Arial", 7)).pack()
 
+        # تقرير نقاط الضعف
+        try:
+            tk.Label(self, text="🎯 تقرير نقاط الضعف", bg=C["bg"], fg=C["text"],
+                     font=("Arial", 11, "bold")).pack(anchor="w", padx=20, pady=(16, 6))
+            
+            report = self.app.db.get_weakness_report()
+            report_frame = tk.Frame(self, bg=C["surface"], padx=14, pady=10,
+                                    highlightbackground=C["border"], highlightthickness=1)
+            report_frame.pack(fill="x", padx=20, pady=(0, 12))
+            
+            for line in report.split("\n"):
+                if "⚠️" in line:
+                    fg = C["warning"]
+                elif "💡" in line:
+                    fg = C["green"]
+                elif "=" in line or ":" not in line:
+                    fg = C["text3"]
+                else:
+                    fg = C["text2"]
+                tk.Label(report_frame, text=line, bg=C["surface"], fg=fg,
+                         font=("Arial", 9), anchor="w", justify="left").pack(anchor="w")
+        except Exception as e:
+            pass
+
         self.after(5000, self._refresh)

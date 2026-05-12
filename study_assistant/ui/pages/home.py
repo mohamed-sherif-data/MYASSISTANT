@@ -9,6 +9,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 from typing import TYPE_CHECKING
+from datetime import date
 
 from config import C, LEVEL_COLORS
 from services.tts import HAS_TTS
@@ -140,7 +141,7 @@ class HomePage(tk.Frame):
 
             # التقدم اليومي
             self.streak_val.config(text=str(self.app.xp.get_streak()))
-            today_words = self.app.db.get_daily_stats(__import__("datetime").date.today().isoformat()).get("words_added", 0)
+            today_words = self.app.db.get_daily_stats(date.today().isoformat()).get("words_added", 0)
             self.words_today_val.config(text=str(today_words))
 
             ch = self.app.challenge.get()
