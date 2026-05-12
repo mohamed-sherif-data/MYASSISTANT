@@ -146,4 +146,29 @@ class PomodoroSettingsDialog:
         tk.Button(f, text="💾 حفظ", command=_save,
                   bg=C["accent"], fg="white",
                   font=("Arial", 11, "bold"), relief="flat",
-                  padx=20, pady=8).pack(pady=14)
+                  padx=20, pady=8).pack(pady=14)# ════════════════════════════════════════════════════════════════════════════
+# Toast Notifications - إشعارات منبثقة
+# ════════════════════════════════════════════════════════════════════════════
+
+class ToastNotification:
+    """إشعار منبثق يظهر للحظة."""
+
+    def __init__(self, root: tk.Tk) -> None:
+        self.root = root
+
+    def show(self, message: str, color: str = C["primary"], duration: int = 3000) -> None:
+        """إظهار إشعار منبثق."""
+        toast = tk.Toplevel(self.root)
+        toast.overrideredirect(True)
+        toast.attributes("-topmost", True)
+        
+        # وضع في الزاوية اليسرى
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        toast.geometry(f"300x60+{sw-320}+{sh-80}")
+        toast.configure(bg=color)
+        
+        tk.Label(toast, text=message, bg=color, fg="white",
+                font=("Arial", 10, "bold")).pack(expand=True)
+        
+        # إخفاء بعد المدة
+        self.root.after(duration, toast.destroy)
