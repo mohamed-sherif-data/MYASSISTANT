@@ -25,6 +25,8 @@ from services.translator import TranslationManager
 from services.pdf_manager import PDFManager
 from services.youtube import YouTubeSummarizer, HAS_YT
 from services.sentence_builder import SentenceBuilder
+from services.chatbot import ChatbotPractice
+from services.paragraph_processor import ParagraphProcessor
 
 # ── ui ────────────────────────────────────────────────────────────────────
 from ui.dashboard import Dashboard
@@ -86,6 +88,12 @@ class StudyAssistant:
 
         # ─ـ Sentence Builder ────────────────────────────────────────────
         self.sentences = SentenceBuilder(self.groq)
+
+        # ─ـ Chatbot ───────────────────────────────────────────────────────
+        self.chatbot = ChatbotPractice(self.groq, self.db)
+
+        # ─ـ Paragraph Processor ────────────────────────────────────────
+        self.paragraph = ParagraphProcessor(self.groq, self.db)
 
         # ─ـ ربط observer ────────────────────────────────────────────────
         self.db.on_word_saved(lambda total: [

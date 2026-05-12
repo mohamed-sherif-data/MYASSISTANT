@@ -11,7 +11,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from typing import TYPE_CHECKING
 
-from config import C, DEFAULT_SUBJECTS
+from config import C, DEFAULT_SUBJECTS, PREPOSITIONS
 from services.groq_client import GROQ_MODELS
 
 if TYPE_CHECKING:
@@ -131,6 +131,13 @@ class SettingsPage(tk.Frame):
                   relief="flat", padx=14, pady=6).pack(anchor="w")
         tk.Label(cb, text="تدرب على استخدام الكلمات بالمحادثة!",
                 bg=C["card_bg"], fg=C["text3"], font=("Arial", 8)).pack(anchor="w", pady=(4, 0))
+
+        # ── حروف الجر ───────────────────────────────────────────────────────────
+        pp = self._card(f, "📖 حروف الجر المقترحة")
+        pp.pack(fill="x", padx=20, pady=(0, 10))
+        tk.Label(pp, text=f"حروف الجر: {', '.join(PREPOSITIONS)}",
+                bg=C["card_bg"], fg=C["text2"], font=("Consolas", 8),
+                wraplength=350, justify="left").pack(anchor="w")
 
     def _card(self, parent, title: str) -> tk.Frame:
         frame = tk.Frame(parent, bg=C["card_bg"], padx=14, pady=10,
