@@ -25,7 +25,7 @@ DEFAULT_MODEL = GROQ_MODELS[0]
 
 
 class GroqClient:
-    """عميل Groq API بسيط ومستقل."""
+    """عميل Groq API بسيط ومستقل مع دعم مفاتيح API متعددة."""
 
     HOST = "api.groq.com"
     PATH = "/openai/v1/chat/completions"
@@ -35,13 +35,25 @@ class GroqClient:
         self._key: str = ""
         self._model: str = DEFAULT_MODEL
         self._ready: bool = False
+        self._keys: list[str] = []  # قائمة المفاتيح
+        self._current_key_index: int = 0
         self._init_from_db()
 
     def _init_from_db(self) -> None:
-        key = self.db.get_setting("GROQ_API_KEY", "").strip()
-        if not key or len(key) < 20:
+        # قراءة المفاتيح المتعددة
+        keys_json = self.db.get_json_setting("GROQ_API_KEYS", [])
+        if isinstance(keys_json, list) and keys_json:
+            self._keys = keys_json
+        else:
+            # مفتاح واحد فقط (التوافق مع الإصدار السابق)
+            key = self.db.get_setting("GROQ_API_KEY", "").strip()
+            if key and len(key) >= 20:
+                self._keys = [key]
+        
+        if not self._keys:
             return
-        self._key = key
+            
+        self._key = self._keys[0]
         self._model = self.db.get_setting("GROQ_MODEL", DEFAULT_MODEL)
         self._ready = True
 
@@ -52,6 +64,49 @@ class GroqClient:
     @property
     def model(self) -> str:
         return self._model
+
+    def add_key(self, key: str) -> bool:
+        """إضافة مفتاح API جديد إلى البنك."""
+        key = key.strip()
+        if not key or len(key) < 20 or key in self._keys:
+            return False
+        
+        # اختبار المفتاح
+        temp_key = self._key
+        self._key = key
+        try:
+            resp = self._call("Say only: OK", timeout=8)
+            if resp:
+                self._keys.append(key)
+                self._save_keys()
+                return True
+        except:
+            pass
+        self._key = temp_key
+        return False
+
+    def remove_key(self, key: str) -> bool:
+        """حذف مفتاح من البنك."""
+        if key in self._keys and len(self._keys) > 1:
+            self._keys.remove(key)
+            self._save_keys()
+            if self._key == key:
+                self._key = self._keys[0]
+            return True
+        return False
+
+    def _rotate_key(self) -> bool:
+        """الت转到 مفتاح التالي."""
+        if len(self._keys) <= 1:
+            return False
+        self._current_key_index = (self._current_key_index + 1) % len(self._keys)
+        self._key = self._keys[self._current_key_index]
+        logger.info(f"Rotated to key #{self._current_key_index + 1}")
+        return True
+
+    def _save_keys(self) -> None:
+        """حفظ قائمة المفاتيح."""
+        self.db.set_json_setting("GROQ_API_KEYS", self._keys)
 
     def set_key(self, key: str, model: str = DEFAULT_MODEL) -> bool:
         """يحفظ ويختبر مفتاح API جديد. يعيد True عند النجاح."""

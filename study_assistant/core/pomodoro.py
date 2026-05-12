@@ -22,6 +22,8 @@ DEFAULT_CONFIG = {
     "short_break":        5,
     "long_break":         15,
     "cycles_before_long": 4,
+    "sound_enabled":      True,
+    "custom_sound":      "",  # مسار ملف صوتي مخصص
 }
 
 

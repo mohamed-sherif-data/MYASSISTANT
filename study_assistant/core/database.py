@@ -76,6 +76,8 @@ class Database:
             level           TEXT DEFAULT 'B1',
             example         TEXT DEFAULT '',
             example_trans   TEXT DEFAULT '',
+            extra_example   TEXT DEFAULT '',      -- مثال إضافي
+            extra_example_trans TEXT DEFAULT '', -- ترجمة المثال الإضافي
             related_words   TEXT DEFAULT '[]',
             synonyms        TEXT DEFAULT '[]',
             antonyms        TEXT DEFAULT '[]',

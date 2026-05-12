@@ -10,6 +10,17 @@ BASE_DIR     = Path(__file__).parent
 NOTES_DIR    = BASE_DIR / "StudyNotes"
 CONFIG_ENV   = BASE_DIR / "config.env"
 
+# ── إعدادات ────────────────────────────────────────────────────────
+# اختصار التفعيل (الافتراضي: Ctrl+Shift+S)
+DEFAULT_HOTKEY = "Ctrl+Shift+S"
+
+# حروف الجر الشائعة
+PREPOSITIONS = [
+    "in", "on", "at", "to", "for", "with", "by", "from",
+    "of", "about", "into", "through", "during", "before",
+    "after", "above", "below", "between", "under", "against",
+]
+
 # ── ألوان Dark Theme ─────────────────────────────────────────────────────
 C: dict[str, str] = {
     "bg":        "#0d1117",
