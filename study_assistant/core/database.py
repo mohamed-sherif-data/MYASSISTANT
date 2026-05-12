@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import sqlite3
 import threading
 from datetime import date, timedelta
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 # ── المسار الافتراضي لقاعدة البيانات ──────────────────────────────────────
 DB_PATH = Path(__file__).parent.parent / "data" / "study_assistant.db"
+BACKUP_DIR = Path(__file__).parent.parent / "data" / "backups"
 
 
 class Database:
@@ -30,9 +32,25 @@ class Database:
     def __init__(self, db_path: Path | str = DB_PATH) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()  # اتصال منفصل لكل خيط
         self._init_db()
+        self._auto_backup()
         self._word_saved_callbacks: list[Callable[[int], None]] = []
+
+    def _auto_backup(self) -> None:
+        """نسخة احتياطية يومية من قاعدة البيانات."""
+        try:
+            today_backup = BACKUP_DIR / f"study_assistant_{date.today().isoformat()}.db"
+            if not today_backup.exists() and self.db_path.exists():
+                shutil.copy2(self.db_path, today_backup)
+                # الاحتفاظ بآخر 7 نسخ فقط
+                backups = sorted(BACKUP_DIR.glob("study_assistant_*.db"))
+                for old in backups[:-7]:
+                    old.unlink()
+                logger.info(f"Daily backup created: {today_backup.name}")
+        except Exception as e:
+            logger.warning(f"Auto backup failed: {e}")
 
     # ── الاتصال بالخيط الحالي ───────────────────────────────────────────
     @property

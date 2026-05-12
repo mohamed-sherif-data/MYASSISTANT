@@ -18,6 +18,7 @@ from ui.pages.home import HomePage
 from ui.pages.review import ReviewPage
 from ui.pages.words import WordsPage
 from ui.pages.stats import StatsPage
+from ui.pages.subject_stats import SubjectStatsPage
 from ui.pages.settings import SettingsPage
 
 
@@ -28,6 +29,7 @@ class Dashboard:
         ("🏠  الرئيسية", "home"),
         ("🃏  مراجعة",   "review"),
         ("📋  الكلمات",  "words"),
+        ("📈  لكل مادة", "subject_stats"),
         ("📊  إحصائيات", "stats"),
         ("⚙️  الإعدادات","settings"),
     ]
@@ -70,6 +72,7 @@ class Dashboard:
         self.pages["home"]     = HomePage(self.main_area, self.app)
         self.pages["review"]   = ReviewPage(self.main_area, self.app)
         self.pages["words"]    = WordsPage(self.main_area, self.app)
+        self.pages["subject_stats"] = SubjectStatsPage(self.main_area, self.app)
         self.pages["stats"]    = StatsPage(self.main_area, self.app)
         self.pages["settings"] = SettingsPage(self.main_area, self.app)
 
