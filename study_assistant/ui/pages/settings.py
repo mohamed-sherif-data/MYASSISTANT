@@ -89,6 +89,49 @@ class SettingsPage(tk.Frame):
                   bg=C["surface2"], fg=C["text2"], font=("Arial", 10),
                   relief="flat", padx=14, pady=6).pack(anchor="w")
 
+        # ── مفاتيح API ─────────────────────────────────────────────────────
+        ak = self._card(f, "🔑ibank API Keys (دوران تلقائي)")
+        ak.pack(fill="x", padx=20, pady=(0, 10))
+        tk.Label(ak, text="أضف مفاتيح إضافية للدوران التلقائي:",
+                bg=C["card_bg"], fg=C["text2"], font=("Arial", 9)).pack(anchor="w")
+        add_key_row = tk.Frame(ak, bg=C["card_bg"])
+        add_key_row.pack(fill="x", pady=4)
+        self.extra_key_var = tk.StringVar()
+        tk.Entry(add_key_row, textvariable=self.extra_key_var, bg=C["surface2"],
+                 fg=C["text"], font=("Consolas", 8), relief="flat", bd=4, show="*").pack(side="left", fill="x", expand=True)
+        tk.Button(add_key_row, text="➕",
+                 command=self._add_extra_key,
+                 bg=C["primary"], fg="white", font=("Arial", 9),
+                 relief="flat", padx=8).pack(side="left", padx=4)
+        
+        # عرض المفاتيح المحفوظة
+        keys_frame = tk.Frame(ak, bg=C["card_bg"])
+        keys_frame.pack(fill="x", pady=4)
+        self._refresh_keys(keys_frame)
+
+        # ── اختصار التفعيل ─────────────────────────────────────────────────────
+        hk = self._card(f, "⌨️ اختصار التفعيل")
+        hk.pack(fill="x", padx=20, pady=(0, 10))
+        tk.Label(hk, text="اختصار فتح النافذة:",
+                bg=C["card_bg"], fg=C["text2"], font=("Arial", 9)).pack(anchor="w")
+        self.hotkey_var = tk.StringVar(value=self.app.db.get_setting("hotkey", "Ctrl+Shift+S"))
+        tk.Entry(hk, textvariable=self.hotkey_var, bg=C["surface2"],
+                 fg=C["text"], font=("Consolas", 10), relief="flat", bd=4).pack(fill="x", pady=4)
+        tk.Button(hk, text="💾 حفظ",
+                 command=self._save_hotkey,
+                 bg=C["accent"], fg="white", font=("Arial", 9),
+                 relief="flat", padx=10).pack(anchor="w")
+
+        # ── Chatbot الممارسة ─────────────────────────────────────────────────────
+        cb = self._card(f, "💬 Chatbot الممارسة")
+        cb.pack(fill="x", padx=20, pady=(0, 10))
+        tk.Button(cb, text="💬 بدء محادثة",
+                  command=self._open_chatbot,
+                  bg=C["primary"], fg="white", font=("Arial", 10),
+                  relief="flat", padx=14, pady=6).pack(anchor="w")
+        tk.Label(cb, text="تدرب على استخدام الكلمات بالمحادثة!",
+                bg=C["card_bg"], fg=C["text3"], font=("Arial", 8)).pack(anchor="w", pady=(4, 0))
+
     def _card(self, parent, title: str) -> tk.Frame:
         frame = tk.Frame(parent, bg=C["card_bg"], padx=14, pady=10,
                          highlightbackground=C["border"], highlightthickness=1)
@@ -149,3 +192,38 @@ class SettingsPage(tk.Frame):
         # فتح إعدادات البومودورو
         from ui.dialogs import PomodoroSettingsDialog
         PomodoroSettingsDialog(self.app).show()
+
+    def _add_extra_key(self) -> None:
+        key = self.extra_key_var.get().strip()
+        if not key or len(key) < 20:
+            messagebox.showwarning("تنبيه", "المفتاح قصير جداً")
+            return
+        def _test():
+            self.app.groq.add_key(key)
+            self.app.root.after(0, lambda: messagebox.showinfo("✅", "تمت إضافة المفتاح!"))
+        threading.Thread(target=_test, daemon=True).start()
+
+    def _refresh_keys(self, frame: tk.Frame) -> None:
+        for w in frame.winfo_children():
+            w.destroy()
+        # عرض المفاتيح (اختصار لسباب الأمان)
+        keys = getattr(self.app.groq, "_keys", [])
+        if not keys:
+            tk.Label(frame, text="لا توجد مفاتيح إضافية",
+                   bg=C["card_bg"], fg=C["text3"], font=("Arial", 8)).pack()
+        else:
+            for i, k in enumerate(keys, 1):
+                short = k[:8] + "..." + k[-4:] if len(k) > 15 else k
+                curr = " ✓" if i == 1 else ""
+                tk.Label(frame, text=f"Key {i}: {short}{curr}",
+                       bg=C["card_bg"], fg=C["text2"], font=("Consolas", 8)).pack(anchor="w")
+
+    def _save_hotkey(self) -> None:
+        hotkey = self.hotkey_var.get().strip()
+        if hotkey:
+            self.app.db.set_setting("hotkey", hotkey)
+            messagebox.showinfo("✅", f"تم حفظ الاختصار: {hotkey}\nأعد تشغيل التطبيق")
+
+    def _open_chatbot(self) -> None:
+        from ui.chatbot import ChatbotWindow
+        ChatbotWindow(self.app).show()
