@@ -33,7 +33,11 @@ class SettingsPage(tk.Frame):
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-
+        
+        # تحديث الـ Canvas لعرض كل العناصر
+        canvas.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        
         # العمل داخل scroll_frame
         f = scroll_frame
         tk.Label(f, text="⚙️ الإعدادات", bg=C["bg"], fg=C["text"],
